@@ -7,9 +7,9 @@ if __name__ == "__main__":
     #app = GUIdeploy(root, data_lock=data_lock, latest_data=latest_data)
     #root.mainloop()
 
-    threading.Thread(target=thread_DS18B20, daemon=True).start()
-    threading.Thread(target=thread_DHT_UV, daemon=True).start()
-    threading.Thread(target=thread_guardado, daemon=True).start()
+    #threading.Thread(target=thread_DS18B20, daemon=True).start()
+    #threading.Thread(target=thread_DHT_UV, daemon=True).start()
+    #threading.Thread(target=thread_guardado, daemon=True).start()
 
     root = tk.Tk()
     app = GUIdeploy(root)

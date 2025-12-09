@@ -43,6 +43,8 @@ latest_data = {
     'Temperatura4': None,
     'Humedad1': None,
     'Humedad2': None,
+    'Temperatura5': None,
+    'Temperatura6': None,
     'UV1': None,
     'timestamp': None
 }
@@ -68,13 +70,13 @@ def thread_DS18B20():
         try:
             temp1 = sensor1.get_temperature()
             temp2 = sensor2.get_temperature()
-            #temp3 = sensor3.get_temperature()
-            #temp4 = sensor4.get_temperature()
+            temp3 = sensor3.get_temperature()
+            temp4 = sensor4.get_temperature()
             with data_lock:
                 latest_data['Temperatura1'] = temp1
                 latest_data['Temperatura2'] = temp2
-                #latest_data['Temperatura3'] = temp3
-                #latest_data['Temperatura4'] = temp4
+                latest_data['Temperatura3'] = temp3
+                latest_data['Temperatura4'] = temp4
                 latest_data['timestamp'] = datetime.now()
         except Exception as e:
             print(f"Error lectura DS18B20: {e}")
