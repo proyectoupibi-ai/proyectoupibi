@@ -27,10 +27,10 @@ def setupUV():
 # Inicialización sensores
 dht1 = adafruit_dht.DHT22(board.D27)    # Sensor DHT22 - 1
 dht2 = adafruit_dht.DHT22(board.D22)    # Sensor DHT22 - 2
-#sensor1 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="3387008797ca")
-#sensor2 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="678e008778c2")
-sensor1 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="32cf0087e27c")
-sensor2 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="447500876c5e")
+sensor1 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="3387008797ca")
+sensor2 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="678e008778c2")
+sensor3 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="32cf0087e27c")
+sensor4 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="447500876c5e")
 setupUV()
 
 # Variables compartidas Threading 

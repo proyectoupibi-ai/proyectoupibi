@@ -184,9 +184,6 @@ def INICIO():
     except ValueError:
         messagebox.showerror("Error", "Introduce valores válidos")
 
-#Funciones paro de Emergencia
-parado = tk.BooleanVar()
-parado.set(False)
 
 def toggle_paro():
     global runing
@@ -209,6 +206,10 @@ def toggle_paro():
 root = tk.Tk()
 root.title("Cámara de Irradiación")
 root.geometry("700x500")
+
+#Funciones paro de Emergencia
+parado = tk.BooleanVar()
+parado.set(False)
 
 # === Frame de inicio ===
 frame_inicio = tk.Frame(root)
