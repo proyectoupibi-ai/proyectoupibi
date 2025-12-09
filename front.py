@@ -22,60 +22,11 @@ Dist, Irrad = config()
 
 # === Función de cálculo ===
 #1 J/m2 = W*s/m2
-def calcularcm():
-    global Dstcl, Tiempo, Dosis, Temperatura
 
-    try:
-        Time = slider_tiempo.get()
-        Dosis = slider_dosis.get()
-        Temperatura = slider_temp.get()
-
-        if Tiempo <= 0:
-            messagebox.showerror("Error", "El tiempo debe ser mayor a 0")
-            return
-
-        Irradiancia = Dosis / (Time*60)
-        Irradiancia = Irradiancia * 1000
-
-        idx = np.argmin(np.abs(Irrad - Irradiancia))
-        Dstcl = Dist[idx]
-        Irrdcl = Irrad[idx]
-
-        if Irradiancia > Irrad[0]:
-            messagebox.showerror("Error", "Irradiancia máxima, aumentar tiempo")
-            return
-        elif Irradiancia < Irrad[-1]:
-            messagebox.showerror("Error", "Irradiancia mínima, disminuir tiempo")
-            return
-        
-        if Irrdcl==Irradiancia:
-            resultado.set(f"Para irradiancia ≈ {Irradiancia:.2f} mW/m2,\n"
-                      f"Distancia ≈ {Dstcl:.3f} cm (valor interpolado ≈ {Irrdcl:.2f})")
-            Tiempo= Time
-        else: 
-            Irrdrl = Irrdcl / 1000
-            tiemposec = Dosis / (Irrdrl * 60)
-            resultado.set(f"Para irradiancia ≈ {Irradiancia:.2f} mW/m2,\n"
-                      f"Distancia ≈ {Dstcl:.3f} cm (valor interpolado ≈ {Irrdcl:.2f})"
-                      f"Tiempo solicitado = {Time} Nuevo tiempo={tiemposec:.2f}")
-            Tiempo = tiemposec
-            slider_temp.set(Tiempo)
-
-
-        plt.plot(Dist, Irrad, color="purple", label="Interpolación 4to grado")
-        plt.scatter(Dstcl, Irrdcl, color="red", label="Punto calculado")
-        plt.xlabel("Distancia (cm)")
-        plt.ylabel("Irradiancia (mW/m2)")
-        plt.title("Punto calculado")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
-    except ValueError:
-        messagebox.showerror("Error", "Introduce valores válidos")
 
 class GUIdeploy:
-    def _init_(self,master, data_lock, latest_data):
+    def _init_(self,root, data_lock, latest_data):
+        master = root
         self.master = master
         master.title("Cámara de Irradiación")
         master.geometry("700x700")
@@ -248,8 +199,8 @@ class GUIdeploy:
             self.remaining_time = self.total_duration
             self.start_time = time.time()
 
-            self.paro_eme.set()     # ← viene del backend
-            self.guardar_event.set()  # ← viene del backend
+            self.paro_eme.set()     #viene del backend
+            self.guardar_event.set()  #viene del backend
 
             threading.Thread(target=self.thread_Control, daemon=True).start()
             threading.Thread(target=self.thread_time, daemon=True).start()
@@ -287,3 +238,65 @@ class GUIdeploy:
                 messagebox.showerror("Error", "Experimento en curso")
         except Exception:
             messagebox.showerror("Error", "Experimento en curso")
+
+    def calcularcm(self):
+        try:
+            Time = self.slider_tiempo.get()
+            Dosis = self.slider_dosis.get()
+            Temperatura = self.slider_temp.get()
+
+            if Time <= 0:
+                messagebox.showerror("Error", "El tiempo debe ser mayor a 0")
+                return
+
+            # Calcular irradiancia requerida
+            Irradiancia = Dosis / (Time * 60)
+            Irradiancia *= 1000   # convertir a mW/m2
+
+            # Buscar valor más cercano en la tabla de irradiancias
+            idx = np.argmin(np.abs(Irrad - Irradiancia))
+            Dstcl = Dist[idx]
+            Irrdcl = Irrad[idx]
+
+            # Validación de límites
+            if Irradiancia > Irrad[0]:
+                messagebox.showerror("Error", "Irradiancia máxima, aumentar tiempo")
+                return
+            elif Irradiancia < Irrad[-1]:
+                messagebox.showerror("Error", "Irradiancia mínima, disminuir tiempo")
+                return
+
+            # Resultados si coincide exactamente
+            if Irrdcl == Irradiancia:
+                self.resultado.set(
+                    f"Para irradiancia ≈ {Irradiancia:.2f} mW/m2,\n"
+                    f"Distancia ≈ {Dstcl:.3f} cm (valor interpolado ≈ {Irrdcl:.2f})"
+                )
+
+            else:
+                # nuevo tiempo requerido
+                Irrdrl = Irrdcl / 1000
+                tiemposec = Dosis / (Irrdrl * 60)
+
+                self.resultado.set(
+                    f"Para irradiancia ≈ {Irradiancia:.2f} mW/m2,\n"
+                    f"Distancia ≈ {Dstcl:.3f} cm (valor interpolado ≈ {Irrdcl:.2f})\n"
+                    f"Tiempo solicitado = {Time} min\n"
+                    f"Nuevo tiempo requerido = {tiemposec:.2f} s"
+                )
+
+                # Ajusta el control deslizante con el nuevo tiempo
+                self.slider_tiempo.set(tiemposec / 60)
+
+            # Graficar
+            plt.plot(Dist, Irrad, color="purple", label="Interpolación 4to grado")
+            plt.scatter(Dstcl, Irrdcl, color="red", label="Punto calculado")
+            plt.xlabel("Distancia (cm)")
+            plt.ylabel("Irradiancia (mW/m2)")
+            plt.title("Punto calculado")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        except ValueError:
+            messagebox.showerror("Error", "Introduce valores válidos")
