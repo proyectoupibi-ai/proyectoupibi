@@ -104,6 +104,7 @@ def thread_DHT_UV():
     while True:
 
         temp5, hum1 = leer_DHT(dht1)
+        time.sleep(2)
         temp6, hum2 = leer_DHT(dht2)
 
         try:
@@ -197,7 +198,7 @@ def config():
 
     return x_line, y_line
 
-if __name__ == "_main_":
+if __name__ == "__main__":
     thread_DHT_UV()
     thread_DS18B20()
 

@@ -25,7 +25,7 @@ Dist, Irrad = config()
 
 
 class GUIdeploy:
-    def _init_(self,root, data_lock, latest_data):
+    def __init__(self,root):
         master = root
         self.master = master
         master.title("Cámara de Irradiación")
@@ -44,9 +44,9 @@ class GUIdeploy:
         self.labels_sensores = {}
 
         self.parado = tk.BooleanVar(value=False)
-        threading.Thread(target=self.thread_DS18B20, daemon=True).start()
-        threading.Thread(target=self.thread_DHT_UV, daemon=True).start()
-        threading.Thread(target=thread_guardado, daemon=True).start()
+        #threading.Thread(target=self.thread_DS18B20, daemon=True).start()
+        #threading.Thread(target=self.thread_DHT_UV, daemon=True).start()
+        #threading.Thread(target=thread_guardado, daemon=True).start()
 
 
         # Mostrar vista inicial
@@ -57,6 +57,23 @@ class GUIdeploy:
         self.data_lock = data_lock
         self.guardar_event = guardar_event
         self.paro_eme = paro_eme
+
+    def fmt(self, val, suf="", nd=2):
+        if val is None:
+            return "---"
+        try:
+            return f"{val:.{nd}f}{suf}"
+        except Exception:
+            return "---"
+
+    def fmt_raw(self, val):
+        return "---" if val is None else str(val)
+    
+    def set_label(self, lbl, val, suf=""):
+        if val is None:
+            lbl.config(text="OFF", fg="red")
+        else:
+            lbl.config(text=f"{val:.2f}{suf}", fg="black")
 
     #-----DEFINICION DE FRAMES-----
         
@@ -139,28 +156,46 @@ class GUIdeploy:
         tk.Button(f, text="Volver al inicio", command=self.mostrar_inicio).grid(row=len(campos)+2, column=0, columnspan=2, pady=10)
 
     def actualizar_lecturas(self):
-        with data_lock:
-            data = latest_data
 
-        print(data)
+        with self.data_lock:
+            data = self.latest_data.copy()
 
-        if data:
-            self.labels_sensores["Temperatura1 (DS18B20-1)"].config(text=f"{data['Temperatura1']:.2f} °C")
-            self.labels_sensores["Temperatura2 (DS18B20-2)"].config(text=f"{data['Temperatura2']:.2f} °C")
-            self.labels_sensores["Temperatura3 (DS18B20-3)"].config(text=f"{data['Temperatura3']:.2f} °C")
-            self.labels_sensores["Temperatura4 (DS18B20-4)"].config(text=f"{data['Temperatura4']:.2f} °C")
+        # DS18B20
+        self.labels_sensores["Temperatura1 (DS18B20-1)"].set_label(
+            text=self.fmt(data.get('Temperatura1'), " °C")
+        )
+        self.labels_sensores["Temperatura2 (DS18B20-2)"].set_label(
+            text=self.fmt(data.get('Temperatura2'), " °C")
+        )
+        self.labels_sensores["Temperatura3 (DS18B20-3)"].set_label(
+            text=self.fmt(data.get('Temperatura3'), " °C")
+        )
+        self.labels_sensores["Temperatura4 (DS18B20-4)"].set_label(
+            text=self.fmt(data.get('Temperatura4'), " °C")
+        )
 
-            self.labels_sensores["Humedad1 (DHT22-1)"].config(text=f"{data['Humedad1']:.2f} %")
-            self.labels_sensores["Humedad2 (DHT22-2)"].config(text=f"{data['Humedad2']:.2f} %")
+        # DHT22 – Humedad
+        self.labels_sensores["Humedad1 (DHT22-1)"].set_label(
+            text=self.fmt(data.get('Humedad1'), " %")
+        )
+        self.labels_sensores["Humedad2 (DHT22-2)"].set_label(
+            text=self.fmt(data.get('Humedad2'), " %")
+        )
 
-            self.labels_sensores["Temperatura5 (DHT22-1)"].config(text=f"{data['Temperatura5']:.2f} °C")
-            self.labels_sensores["Temperatura6 (DHT22-2)"].config(text=f"{data['Temperatura6']:.2f} °C")
+        # DHT22 – Temperatura
+        self.labels_sensores["Temperatura5 (DHT22-1)"].set_label(
+            text=self.fmt(data.get('Temperatura5'), " °C")
+        )
+        self.labels_sensores["Temperatura6 (DHT22-2)"].set_label(
+            text=self.fmt(data.get('Temperatura6'), " °C")
+        )
 
-            self.labels_sensores["UV"].config(text=f"{data['UV1']}")
-        else:
-            for lbl in self.labels_sensores.values():
-                lbl.config(text="---")
+        # UV
+        self.labels_sensores["UV"].set_label(
+            text=self.fmt_raw(data.get('UV1'))
+        )
 
+        # volver a llamar cada segundo
         self.frame_sensores.after(1000, self.actualizar_lecturas)
 
     #-----CAMBIAR ENTRE FRAMES-----
