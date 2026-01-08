@@ -8,8 +8,8 @@ import matplotlib as plt
 
 # === CONFIGURACION THREADS ===
 # Variables compartidas Threading 
-paro_eme = threading.Event()
-paro_eme.set()  # Por defecto, el hilo sigue corriendo
+#paro_eme = threading.Event()
+#paro_eme.set()  # Por defecto, el hilo sigue corriendo
 
 # datos globales 
 Dstcl = 0
@@ -42,12 +42,12 @@ class GUIdeploy:
         self.frame_sensores = tk.Frame(master)
 
         self.labels_sensores = {}
-
         self.parado = tk.BooleanVar(value=False)
-        #threading.Thread(target=self.thread_DS18B20, daemon=True).start()
-        #threading.Thread(target=self.thread_DHT_UV, daemon=True).start()
-        #threading.Thread(target=thread_guardado, daemon=True).start()
 
+        #Construir Frames
+        self.ventana_inicio()
+        self.ventana_settings()
+        self.ventana_sensores()
 
         # Mostrar vista inicial
         self.mostrar_inicio()
@@ -69,11 +69,6 @@ class GUIdeploy:
     def fmt_raw(self, val):
         return "---" if val is None else str(val)
     
-    def set_label(self, lbl, val, suf=""):
-        if val is None:
-            lbl.config(text="OFF", fg="red")
-        else:
-            lbl.config(text=f"{val:.2f}{suf}", fg="black")
 
     #-----DEFINICION DE FRAMES-----
         
@@ -95,11 +90,11 @@ class GUIdeploy:
                 bg="lightgray",
                 command=self.INICIO).pack(pady=10)
 
-        tk.Button(f, text="PARO DE EMERGENCIA",
-                bg="yellow", fg="black",
-                width=45, height=3,
-                font=("Arial", 11, "bold"),
-                command=self.toggle_paro).pack(pady=10)
+        self.btn_STOP = tk.Button(f, text="PARO DE EMERGENCIA",
+                bg="yellow",fg="black", width=45,
+                height=3, font=("Arial", 11, "bold"),
+                command=self.toggle_paro)
+        self.btn_STOP.pack(pady=10)
 
         tk.Button(f, text="CARGAR / RETIRAR MUESTRAS",
                 width=45, height=3,
@@ -161,37 +156,37 @@ class GUIdeploy:
             data = self.latest_data.copy()
 
         # DS18B20
-        self.labels_sensores["Temperatura1 (DS18B20-1)"].set_label(
+        self.labels_sensores["Temperatura1 (DS18B20-1)"].config(
             text=self.fmt(data.get('Temperatura1'), " °C")
         )
-        self.labels_sensores["Temperatura2 (DS18B20-2)"].set_label(
+        self.labels_sensores["Temperatura2 (DS18B20-2)"].config(
             text=self.fmt(data.get('Temperatura2'), " °C")
         )
-        self.labels_sensores["Temperatura3 (DS18B20-3)"].set_label(
+        self.labels_sensores["Temperatura3 (DS18B20-3)"].config(
             text=self.fmt(data.get('Temperatura3'), " °C")
         )
-        self.labels_sensores["Temperatura4 (DS18B20-4)"].set_label(
+        self.labels_sensores["Temperatura4 (DS18B20-4)"].config(
             text=self.fmt(data.get('Temperatura4'), " °C")
         )
 
         # DHT22 – Humedad
-        self.labels_sensores["Humedad1 (DHT22-1)"].set_label(
+        self.labels_sensores["Humedad1 (DHT22-1)"].config(
             text=self.fmt(data.get('Humedad1'), " %")
         )
-        self.labels_sensores["Humedad2 (DHT22-2)"].set_label(
+        self.labels_sensores["Humedad2 (DHT22-2)"].config(
             text=self.fmt(data.get('Humedad2'), " %")
         )
 
         # DHT22 – Temperatura
-        self.labels_sensores["Temperatura5 (DHT22-1)"].set_label(
+        self.labels_sensores["Temperatura5 (DHT22-1)"].config(
             text=self.fmt(data.get('Temperatura5'), " °C")
         )
-        self.labels_sensores["Temperatura6 (DHT22-2)"].set_label(
+        self.labels_sensores["Temperatura6 (DHT22-2)"].config(
             text=self.fmt(data.get('Temperatura6'), " °C")
         )
 
         # UV
-        self.labels_sensores["UV"].set_label(
+        self.labels_sensores["UV"].config(
             text=self.fmt_raw(data.get('UV1'))
         )
 
@@ -273,6 +268,31 @@ class GUIdeploy:
                 messagebox.showerror("Error", "Experimento en curso")
         except Exception:
             messagebox.showerror("Error", "Experimento en curso")
+
+    def toggle_paro(self):
+        if self.parado.get():
+            #REANUDAR
+            self.paro_eme.set()
+            self.btn_STOP.config(
+                text="PARO DE EMERGENCIA",
+                bg="yellow",
+                fg="black"
+            )
+            self.parado.set(False)
+            self.runing = 1
+            print("Experimento reanudado.")
+
+        else:
+            #PARO
+            self.paro_eme.clear()
+            self.btn_STOP.config(
+                text="REANUDAR",
+                bg="red",
+                fg="white"
+            )
+            self.parado.set(True)
+            self.runing = 0
+            print("Experimento pausado.")
 
     def calcularcm(self):
         try:
