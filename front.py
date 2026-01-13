@@ -232,8 +232,8 @@ class GUIdeploy:
             self.paro_eme.set()     #viene del backend
             self.guardar_event.set()  #viene del backend
 
-            threading.Thread(target=self.thread_Control, daemon=True).start()
-            threading.Thread(target=self.thread_time, daemon=True).start()
+            threading.Thread(target=thread_Control, daemon=True).start()
+            threading.Thread(target=thread_time, daemon=True).start()
 
             self.runing = 1
             self.actualizar_tiempo_restante()

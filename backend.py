@@ -182,6 +182,40 @@ def thread_guardado():
 
         time.sleep(1)
 
+#hilo para controlar Temperatura
+def thread_Control():
+    global latest_data, remaining_time
+    while True and remaining_time > 0:
+        paro_eme.wait()  #paro de emergencia
+
+        with data_lock:
+                data = latest_data
+        if data:
+
+            valores_temp = [data['Temperatura1'], data['Temperatura2'], data['Temperatura3'], data['Temperatura4']]
+            valores_validos = [t for t in valores_temp if t is not None]
+
+            if valores_validos:
+                Tmean = sum(valores_validos) / len(valores_validos)
+                print(f"Temperatura promedio: {round(Tmean, 2)} °C")
+            else:
+                print("Temperatura promedio no disponible (todos los sensores fallaron)")
+
+        time.sleep(2.0)
+
+#hilo para contar tiempo restante del experimento 
+def thread_time():
+    global remaining_time, start_time, total_duration
+
+    while True and remaining_time > 0:
+        paro_eme.wait()  #paro de emergencia
+
+        now = time.time()
+        elapsed = now - start_time
+        remaining_time = max(total_duration - elapsed,0)
+
+        time.sleep(0.01)
+
 # === Datos base ===
 cm = np.array([5.5, 11, 16.5, 22, 27.5])   # valores de distancia (cm)
 I = np.array([12860.42, 10472.92, 8147.5, 6287.5, 5150])   # valores de irradiancia (mW/m2)
