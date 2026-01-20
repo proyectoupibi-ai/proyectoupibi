@@ -7,22 +7,38 @@ import threading
 from datetime import datetime
 import time
 import csv
+import smbus
 import numpy as np
 
-# Config Sensor UV
-ADDRESS = 0x1c 
-I2C_1   = 0x01
-LTR390UV = DFRobot_LTR390UV_I2C(I2C_1 ,ADDRESS)
+I2C_BUS = 1
+TCA_ADDRESS = 0x70       # Dirección por defecto del TCA9548A
+UV_ADDRESS = 0x1C        # Dirección del LTR390-UV
 
-# Setup Sensor UV
-def setupUV():
-    while not LTR390UV.begin():
-        print("Sensor UV no se pudo inicializar. Reintentando...")
+bus = smbus.SMBus(I2C_BUS)
+
+def tca_select(channel):
+    if channel < 0 or channel > 7:
+        raise ValueError("Canal fuera de rango (0-7)")
+    bus.write_byte(TCA_ADDRESS, 1 << channel)
+    time.sleep(0.01)
+
+def init_uv_sensor(channel):
+    tca_select(channel)
+    sensor = DFRobot_LTR390UV_I2C(I2C_BUS, UV_ADDRESS)
+
+    while not sensor.begin():
+        print(f"Canal {channel} no responde. Reintentando...")
         time.sleep(1)
-    print("Sensor UV inicializado correctamente.")
-    LTR390UV.set_ALS_or_UVS_meas_rate(e18bit, e100ms)
-    LTR390UV.set_ALS_or_UVS_gain(eGain1)
-    LTR390UV.set_mode(UVSMode)
+
+    sensor.set_ALS_or_UVS_meas_rate(e18bit, e100ms)
+    sensor.set_ALS_or_UVS_gain(eGain1)
+    sensor.set_mode(UVSMode)
+
+    print(f"Sensor UV inicializado en canal {channel}")
+    return sensor
+
+uv_sensors = {}
+CHANNELS = [0, 1, 4, 6]   # Canales usados del TCA9548A
 
 # Inicialización sensores
 dht1 = adafruit_dht.DHT22(board.D27)    # Sensor DHT22 - 1
@@ -31,7 +47,9 @@ sensor1 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="3387008797ca")
 sensor2 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="678e008778c2")
 sensor3 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="32cf0087e27c")
 sensor4 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="447500876c5e")
-setupUV()
+
+for ch in CHANNELS:
+    uv_sensors[ch] = init_uv_sensor(ch)
 
 # Variables compartidas Threading 
 paro_eme = threading.Event()
@@ -46,6 +64,9 @@ latest_data = {
     'Temperatura5': None,
     'Temperatura6': None,
     'UV1': None,
+    'UV2': None,
+    'UV3': None,
+    'UV4': None,
     'timestamp': None
 }
 data_lock = threading.Lock()
@@ -98,6 +119,28 @@ def leer_DHT(dht_sensor, reintentos=6, t=2):
 
     return None, None
 
+def leer_Uvs():
+    uv_values = {}
+    for ch, sensor in uv_sensors.items():
+        try:
+            tca_select(ch)
+            sensor.set_ALS_or_UVS_meas_rate(e18bit, e100ms)
+            sensor.set_ALS_or_UVS_gain(eGain1)
+            sensor.set_mode(UVSMode)
+
+            time.sleep(1)  # Esperar configuración
+
+            sensor.read_original_data()
+            time.sleep(0.3) # Ignorar primer lectura
+
+            uv_values(ch) = sensor.read_original_data()
+
+        except Exception as e:
+            print(f"[ERROR] Lectura canal {ch}: {e}")
+        time.sleep(5)
+        
+        return uv_values
+
 # Hilo de lectura de sensores DHT y UV
 def thread_DHT_UV():
     global latest_data
@@ -107,18 +150,17 @@ def thread_DHT_UV():
         time.sleep(2)
         temp6, hum2 = leer_DHT(dht2)
 
-        try:
-            uv_data = LTR390UV.read_original_data()
-        except Exception as e:
-            print(f"Error lectura UV: {e}")
-            uv_data = None
+        uvs = leer_Uvs()
 
         with data_lock:
             latest_data['Temperatura5'] = temp5
             latest_data['Temperatura6'] = temp6
             latest_data['Humedad1'] = hum1
             latest_data['Humedad2'] = hum2
-            latest_data['UV1'] = str(uv_data)
+            latest_data['UV1'] = uvs.get(0)
+            latest_data['UV2'] = uvs.get(1)
+            latest_data['UV3'] = uvs.get(4)
+            latest_data['UV4'] = uvs.get(6)
             latest_data['timestamp'] = datetime.now()
 
         time.sleep(20.0)  
