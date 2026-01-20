@@ -9,7 +9,7 @@ UV_ADDRESS = 0x1C        # Dirección del LTR390-UV
 bus = smbus.SMBus(I2C_BUS)
 
 def tca_select(channel):
-    if channel < 0 or channel > 3:
+    if channel < 0 or channel > 7:
         raise ValueError("Canal TCA fuera de rango (0-7)")
     bus.write_byte(TCA_ADDRESS, 1 << channel)
     time.sleep(0.01)
@@ -30,7 +30,7 @@ def init_uv_sensor(channel):
     return sensor
 
 uv_sensors = {}
-CHANNELS = [0, 1]   # Canales usados del TCA9548A
+CHANNELS = [0, 1, 4, 6]   # Canales usados del TCA9548A
 
 for ch in CHANNELS:
     uv_sensors[ch] = init_uv_sensor(ch)
