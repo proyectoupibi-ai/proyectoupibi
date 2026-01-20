@@ -4,7 +4,7 @@ from tkinter import messagebox
 import threading
 from backend import *
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 # === CONFIGURACION THREADS ===
 # Variables compartidas Threading 
@@ -17,6 +17,9 @@ Tiempo = 1
 Temperatura = 20
 Dosis = 1
 runing = 0
+remaining_time = 0
+total_duration = 0
+start_time = 0
 
 Dist, Irrad = config()
 
@@ -32,7 +35,7 @@ class GUIdeploy:
         master.geometry("700x700")
         master.resizable(False, False)
 
-        self.remaining_time = 0
+        #self.remaining_time = 0
         self.total_duration = 0
         self.runing = 0
 
@@ -57,6 +60,7 @@ class GUIdeploy:
         self.data_lock = data_lock
         self.guardar_event = guardar_event
         self.paro_eme = paro_eme
+        #self.remaining_time = remaining_time
 
     def fmt(self, val, suf="", nd=2):
         if val is None:
@@ -85,10 +89,11 @@ class GUIdeploy:
                 width=45, height=3,
                 command=self.mostrar_sensores).pack(pady=10)
 
-        tk.Button(f, text="Iniciar experimento",
+        self.btn_INICIO = tk.Button(f, text="Iniciar experimento",
                 width=45, height=3,
                 bg="lightgray",
-                command=self.INICIO).pack(pady=10)
+                command=self.INICIO)
+        self.btn_INICIO.pack(pady=10)
 
         self.btn_STOP = tk.Button(f, text="PARO DE EMERGENCIA",
                 bg="yellow",fg="black", width=45,
@@ -139,7 +144,10 @@ class GUIdeploy:
             "Humedad2 (DHT22-2)",
             "Temperatura5 (DHT22-1)",
             "Temperatura6 (DHT22-2)",
-            "UV"
+            "UV1",
+            "UV2",
+            "UV3",
+            "UV4"
         ]
 
         for i, campo in enumerate(campos):
@@ -186,8 +194,17 @@ class GUIdeploy:
         )
 
         # UV
-        self.labels_sensores["UV"].config(
+        self.labels_sensores["UV1"].config(
             text=self.fmt_raw(data.get('UV1'))
+        )
+        self.labels_sensores["UV2"].config(
+            text=self.fmt_raw(data.get('UV2'))
+        )
+        self.labels_sensores["UV3"].config(
+            text=self.fmt_raw(data.get('UV3'))
+        )
+        self.labels_sensores["UV4"].config(
+            text=self.fmt_raw(data.get('UV4'))
         )
 
         # volver a llamar cada segundo

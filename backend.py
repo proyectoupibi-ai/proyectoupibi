@@ -133,12 +133,12 @@ def leer_Uvs():
             sensor.read_original_data()
             time.sleep(0.3) # Ignorar primer lectura
 
-            uv_values(ch) = sensor.read_original_data()
+            uv_values[ch] = sensor.read_original_data()
 
         except Exception as e:
             print(f"[ERROR] Lectura canal {ch}: {e}")
         time.sleep(5)
-        
+
         return uv_values
 
 # Hilo de lectura de sensores DHT y UV
