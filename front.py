@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import threading
-from backend import *
+import backend as BND
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -21,7 +21,7 @@ remaining_time = 0
 total_duration = 0
 start_time = 0
 
-Dist, Irrad = config()
+Dist, Irrad = BND.config()
 
 # === Función de cálculo ===
 #1 J/m2 = W*s/m2
@@ -242,22 +242,19 @@ class GUIdeploy:
     def INICIO(self):
         try:
             Tiempo = self.slider_tiempo.get()
-            self.total_duration = Tiempo * 60
-            self.remaining_time = self.total_duration
-            self.start_time = time.time()
+
+            BND.iniciar_experimento(Tiempo)
 
             self.paro_eme.set()     #viene del backend
             self.guardar_event.set()  #viene del backend
 
-            threading.Thread(target=thread_Control, daemon=True).start()
-            threading.Thread(target=thread_time, daemon=True).start()
+            threading.Thread(target=BND.thread_Control, daemon=True).start()
+            threading.Thread(target=BND.thread_time, daemon=True).start()
 
             self.runing = 1
             self.actualizar_tiempo_restante()
 
             self.btn_INICIO.config(bg="green", fg="white", text="Experimento en curso")
-
-            print(f"Experimento iniciado {Tiempo} minutos")
 
             def check_end():
                 if self.remaining_time <= 0:
@@ -358,7 +355,7 @@ class GUIdeploy:
                 )
 
                 # Ajusta el control deslizante con el nuevo tiempo
-                self.slider_tiempo.set(tiemposec / 60)
+                self.slider_tiempo.set(tiemposec)
 
             # Graficar
             plt.plot(Dist, Irrad, color="purple", label="Interpolación 4to grado")

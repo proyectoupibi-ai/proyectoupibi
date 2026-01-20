@@ -76,6 +76,9 @@ Dstcl = 0
 Tiempo = 1
 Temperatura = 20
 Dosis = 1
+remaining_time = 0
+total_duration = 0
+start_time = 0
 runing = 0
 
 # Config base de datos
@@ -139,7 +142,7 @@ def leer_Uvs():
             print(f"[ERROR] Lectura canal {ch}: {e}")
         time.sleep(5)
 
-        return uv_values
+    return uv_values
 
 # Hilo de lectura de sensores DHT y UV
 def thread_DHT_UV():
@@ -188,7 +191,7 @@ def thread_guardado():
             writer = csv.writer(csvfile)
             if csvfile.tell() == 0:
                 writer.writerow(['Timestamp', 'DS18B20_01', 'DS18B20_02', 'DS18B20_03', 'DS18B20_04', 'Humedad_01',
-                                 'Humedad_02', 'TemperaturaDHT_01', 'TemperaturaDHT_02', 'UV_01'])
+                                 'Humedad_02', 'TemperaturaDHT_01', 'TemperaturaDHT_02', 'UV_01', 'UV_2', 'UV_03', 'UV_04'])
             print(f"[CSV] Guardando en: {filename}")
 
         # Guardado mientras quede tiempo
@@ -208,7 +211,10 @@ def thread_guardado():
                 data['Humedad2'],
                 data['Temperatura5'],
                 data['Temperatura6'],
-                data['UV1']
+                data['UV1'],
+                data['UV2'],
+                data['UV3'],
+                data['UV4']
             ]
 
             writer.writerow(fila)
@@ -223,6 +229,22 @@ def thread_guardado():
         print("[CSV] Guardado detenido (experimento terminado)")
 
         time.sleep(1)
+
+def iniciar_experimento(tiempo_min):
+    global remaining_time, total_duration, start_time, runing
+
+    if runing:
+        return
+
+    total_duration = tiempo_min * 60
+    start_time = time.time()
+    remaining_time = total_duration
+
+    paro_eme.set()
+    guardar_event.set()
+
+    runing = 1
+    print(f"[BACKEND] Experimento iniciado {tiempo_min} min")
 
 #hilo para controlar Temperatura
 def thread_Control():
