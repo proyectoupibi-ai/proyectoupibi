@@ -230,9 +230,9 @@ class GUIdeploy:
     #---FUNCIONES EXTRA----
 
     def actualizar_tiempo_restante(self):
-        if self.remaining_time > 0:
-            minutos = int(self.remaining_time // 60)
-            segundos = int(self.remaining_time % 60)
+        if BND.remaining_time > 0:
+            minutos = int(BND.remaining_time // 60)
+            segundos = int(BND.remaining_time % 60)
             self.label_tiempo.config(text=f"Tiempo restante: {minutos:03d} min {segundos:02d} s")
         else:
             self.label_tiempo.config(text="Experimento finalizado.")
@@ -257,7 +257,7 @@ class GUIdeploy:
             self.btn_INICIO.config(bg="green", fg="white", text="Experimento en curso")
 
             def check_end():
-                if self.remaining_time <= 0:
+                if BND.remaining_time <= 0:
                     self.btn_INICIO.config(bg="lightgray", fg="black", text="Iniciar experimento")
                 else:
                     self.master.after(1000, check_end)
@@ -274,7 +274,7 @@ class GUIdeploy:
     def muestras(self):
         try:
             # Usar variables internas de la clase
-            if self.remaining_time == 0:
+            if BND.remaining_time == 0:
                 self.cargar()
             elif self.runing == 0:
                 self.cargar()

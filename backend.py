@@ -9,6 +9,7 @@ import time
 import csv
 import smbus
 import numpy as np
+import RPi.GPIO as GPIO
 
 I2C_BUS = 1
 TCA_ADDRESS = 0x70       # Dirección por defecto del TCA9548A
@@ -39,6 +40,22 @@ def init_uv_sensor(channel):
 
 uv_sensors = {}
 CHANNELS = [0, 1, 4, 6]   # Canales usados del TCA9548A
+
+# === CONTROL TEMPERATURA ===
+A_RES = 23    # resistencias
+A_PLTR = 24   # peltier
+F_PLTR = 25   # ventiladores celda peltier
+
+GPIO.setup(A_RES, GPIO.OUT)
+GPIO.setup(A_PLTR, GPIO.OUT)
+GPIO.setup(F_PLTR, GPIO.OUT)
+
+LUV_S = 17   # lámparas uv superiores
+LUV_I = 27   # lámparas uv inferiores
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(LUV_S, GPIO.OUT)
+GPIO.setup(LUV_I, GPIO.OUT)
 
 # Inicialización sensores
 dht1 = adafruit_dht.DHT22(board.D27)    # Sensor DHT22 - 1
@@ -295,6 +312,111 @@ def config():
     y_line = poly(x_line)
 
     return x_line, y_line
+
+
+#=======CONTROL RELEVADOR LAMPARAS UV=======
+
+def lamps_on():
+    GPIO.output(LUV_S, GPIO.HIGH)
+    GPIO.output(LUV_I, GPIO.HIGH)#CHECAR CON QUE FUNCIONA EL RELEVADOR
+    print("Lámparas ENCENDIDAS")
+
+def lamps_off():
+    GPIO.output(LUV_S, GPIO.LOW)
+    GPIO.output(LUV_I, GPIO.LOW)
+    print("Lámparas APAGADAS")
+
+#HILO PARA LAMPARAS
+def thread_lamps():
+    global remaining_time
+
+    lamps_off()
+
+    while True:
+        if remaining_time > 0:
+            if paro_eme.is_set():
+                lamps_on()
+            else:
+                lamps_off()
+        else:
+            lamps_off()
+
+        time.sleep(0.5)
+
+#=======CONTROL TEMPERATURA=======
+
+def heat_on():
+    GPIO.output(A_RES, GPIO.HIGH)
+    GPIO.output(A_PLTR, GPIO.LOW)
+    GPIO.output(F_PLTR, GPIO.LOW)
+    print("Calentando...")
+
+def cool_on():
+    GPIO.output(A_PLTR, GPIO.LOW)
+    GPIO.output(A_PLTR, GPIO.HIGH)
+    GPIO.output(F_PLTR, GPIO.HIGH)
+    print("Enfriando...")
+
+def temp_all_off():
+    GPIO.output(A_RES, GPIO.LOW)
+    GPIO.output(A_PLTR, GPIO.LOW)
+    GPIO.output(F_PLTR, GPIO.LOW)
+    print("APAGADO")
+
+def thread_CNTRLtemp():
+    global latest_data, remaining_time, Temperatura
+
+    HISTERESIS = 5.0        # ±°C
+    TEMP_MAX = 80.0         # límite superior
+    TEMP_MIN = 20.0         # límite inferior
+
+    temp_all_off()          
+    while True:
+        if remaining_time <= 0:
+            temp_all_off()
+            time.sleep(1)
+            continue
+        if not paro_eme.is_set():
+            temp_all_off()
+            time.sleep(0.5)
+            continue
+        with data_lock: # Leer temperaturas
+            temps = [
+                latest_data.get('Temperatura1'),
+                latest_data.get('Temperatura2'),
+                latest_data.get('Temperatura3'),
+                latest_data.get('Temperatura4'),
+            ]
+
+        temps_validas = [t for t in temps if t is not None]
+
+        if not temps_validas:
+            print("Sin lecturas válidas")
+            temp_all_off()
+            time.sleep(1)
+            continue
+
+        Tmean = sum(temps_validas) / len(temps_validas)
+        print(f"Temperatura promedio: {round(Tmean,2)} °C")
+
+        if Tmean >= TEMP_MAX or Tmean <= TEMP_MIN:
+            print("LIMITE ALCANZADO")
+            temp_all_off()
+            paro_eme.clear()   # fuerza paro de emergencia
+            time.sleep(2)
+            continue
+
+        # Control ON/OFF con histéresis
+        if Tmean < (Temperatura - HISTERESIS):
+            heat_on()
+
+        elif Tmean > (Temperatura + HISTERESIS):
+            cool_on()
+
+        else:
+            temp_all_off()
+
+        time.sleep(2)  # periodo de control
 
 if __name__ == "__main__":
     thread_DHT_UV()
