@@ -17,9 +17,6 @@ Tiempo = 1
 Temperatura = 20
 Dosis = 1
 runing = 0
-remaining_time = 0
-total_duration = 0
-start_time = 0
 
 Dist, Irrad = BND.config()
 

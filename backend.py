@@ -51,7 +51,7 @@ GPIO.setup(A_PLTR, GPIO.OUT)
 GPIO.setup(F_PLTR, GPIO.OUT)
 
 LUV_S = 17   # lámparas uv superiores
-LUV_I = 27   # lámparas uv inferiores
+LUV_I = 18   # lámparas uv inferiores
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(LUV_S, GPIO.OUT)
@@ -366,7 +366,7 @@ def temp_all_off():
 def thread_CNTRLtemp():
     global latest_data, remaining_time, Temperatura
 
-    HISTERESIS = 5.0        # ±°C
+    HISTERESIS = 1.0        # ±°C
     TEMP_MAX = 80.0         # límite superior
     TEMP_MIN = 20.0         # límite inferior
 
