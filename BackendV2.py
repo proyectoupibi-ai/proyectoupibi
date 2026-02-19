@@ -1,4 +1,4 @@
-#aqui estarán sensores y motores
+#aqui estarán sensores y actuadores
 import adafruit_dht
 from w1thermsensor import W1ThermSensor, Sensor
 import board
@@ -16,6 +16,35 @@ TCA_ADDRESS = 0x70       # Dirección por defecto del TCA9548A
 UV_ADDRESS = 0x1C        # Dirección del LTR390-UV
 
 bus = smbus.SMBus(I2C_BUS)
+
+uv_sensors = {}
+CHANNELS = [0, 1, 4, 6]   # Canales usados del TCA9548A
+
+# === CONTROL TEMPERATURA GPIOS ===
+A_RES = 23    # resistencias
+A_PLTR = 24   # peltier
+F_PLTR = 25   # ventiladores celda peltier
+
+GPIO.setmode(GPIO.BCM)
+
+GPIO.setup(A_RES, GPIO.OUT)
+GPIO.setup(A_PLTR, GPIO.OUT)
+GPIO.setup(F_PLTR, GPIO.OUT)
+
+LUV_S = 17   # lámparas uv superiores
+LUV_I = 18   # lámparas uv inferiores
+
+# === GPIOS LÁMPARAS ===
+GPIO.setup(LUV_S, GPIO.OUT)
+GPIO.setup(LUV_I, GPIO.OUT)
+
+# === Inicialización sensores ===
+dht1 = adafruit_dht.DHT22(board.D27)    # Sensor DHT22 - 1
+dht2 = adafruit_dht.DHT22(board.D22)    # Sensor DHT22 - 2
+sensor1 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="3387008797ca")
+sensor2 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="678e008778c2")
+sensor3 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="32cf0087e27c")
+sensor4 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="447500876c5e")
 
 def tca_select(channel):
     if channel < 0 or channel > 7:
@@ -38,92 +67,29 @@ def init_uv_sensor(channel):
     print(f"Sensor UV inicializado en canal {channel}")
     return sensor
 
-uv_sensors = {}
-CHANNELS = [0, 1, 4, 6]   # Canales usados del TCA9548A
-
-# === CONTROL TEMPERATURA ===
-A_RES = 23    # resistencias
-A_PLTR = 24   # peltier
-F_PLTR = 25   # ventiladores celda peltier
-
-GPIO.setmode(GPIO.BCM)
-
-GPIO.setup(A_RES, GPIO.OUT)
-GPIO.setup(A_PLTR, GPIO.OUT)
-GPIO.setup(F_PLTR, GPIO.OUT)
-
-LUV_S = 17   # lámparas uv superiores
-LUV_I = 18   # lámparas uv inferiores
-
-GPIO.setup(LUV_S, GPIO.OUT)
-GPIO.setup(LUV_I, GPIO.OUT)
-
-# Inicialización sensores
-dht1 = adafruit_dht.DHT22(board.D27)    # Sensor DHT22 - 1
-dht2 = adafruit_dht.DHT22(board.D22)    # Sensor DHT22 - 2
-sensor1 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="3387008797ca")
-sensor2 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="678e008778c2")
-sensor3 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="32cf0087e27c")
-sensor4 = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id="447500876c5e")
-
 for ch in CHANNELS:
     uv_sensors[ch] = init_uv_sensor(ch)
-
-# Variables compartidas Threading 
-paro_eme = threading.Event()
-paro_eme.set()  # Por defecto, el hilo sigue corriendo
-latest_data = {
-    'Temperatura1': None,
-    'Temperatura2': None,
-    'Temperatura3': None,
-    'Temperatura4': None,
-    'Humedad1': None,
-    'Humedad2': None,
-    'Temperatura5': None,
-    'Temperatura6': None,
-    'UV1': None,
-    'UV2': None,
-    'UV3': None,
-    'UV4': None,
-    'timestamp': None
-}
-data_lock = threading.Lock()
-
-# datos globales 
-Dstcl = 0
-Tiempo = 1
-Temperatura = 20
-Dosis = 1
-remaining_time = 0
-total_duration = 0
-start_time = 0
-runing = 0
 
 # Config base de datos
 SAVE_INTERVAL = 60.0
 
-guardar_event = threading.Event()
-guardar_event.clear()  # No guardar todavía
+# === Datos base del experimento ===
+cm = np.array([5.5, 11, 16.5, 22, 27.5])   # valores de distancia (cm)
+I = np.array([12860.42, 10472.92, 8147.5, 6287.5, 5150])   # valores de irradiancia (mW/m2)
+NEMApaso = 0.5 # paso de las charolas (cm)
 
-# Hilo de lectura de sensores DS18B20 (temperatura)
-def thread_DS18B20():
-    global latest_data
-    while True:
-        try:
-            temp1 = sensor1.get_temperature()
-            temp2 = sensor2.get_temperature()
-            temp3 = sensor3.get_temperature()
-            temp4 = sensor4.get_temperature()
-            with data_lock:
-                latest_data['Temperatura1'] = temp1
-                latest_data['Temperatura2'] = temp2
-                latest_data['Temperatura3'] = temp3
-                latest_data['Temperatura4'] = temp4
-                latest_data['timestamp'] = datetime.now()
-        except Exception as e:
-            print(f"Error lectura DS18B20: {e}")
-        time.sleep(1.0)
+# === Interpolación ===
+def config():
+    coef = np.polyfit(cm, I, 4)
+    poly = np.poly1d(coef)
+    pase = int((27.5 - 5.5) / NEMApaso)
+	
+    x_line = np.linspace(min(cm), max(cm), pase)
+    y_line = poly(x_line)
 
+    return x_line, y_line
+
+# === FUNCIONES LECTURA DE SENSORES  ===
 # Función de lectura de sensores DHT
 def leer_DHT(dht_sensor, reintentos=6, t=2):
     for i in range(reintentos):
@@ -161,240 +127,305 @@ def leer_Uvs():
 
     return uv_values
 
-# Hilo de lectura de sensores DHT y UV
-def thread_DHT_UV():
-    global latest_data
-    while True:
+class CamaraUV:
+    def __init__(self):
 
-        temp5, hum1 = leer_DHT(dht1)
-        time.sleep(2)
-        temp6, hum2 = leer_DHT(dht2)
+        # ===== ESTADO =====
+        self.estado = "IDLE"
 
-        uvs = leer_Uvs()
+        # ===== PARAMETROS EXPERIMENTO =====
+        self.total_duration = 0
+        self.start_time = 0
+        self.remaining_time = 0
 
-        with data_lock:
-            latest_data['Temperatura5'] = temp5
-            latest_data['Temperatura6'] = temp6
-            latest_data['Humedad1'] = hum1
-            latest_data['Humedad2'] = hum2
-            latest_data['UV1'] = uvs.get(0)
-            latest_data['UV2'] = uvs.get(1)
-            latest_data['UV3'] = uvs.get(4)
-            latest_data['UV4'] = uvs.get(6)
-            latest_data['timestamp'] = datetime.now()
+        self.setpoint_temp = 25
+        self.dosis = 0
 
-        time.sleep(20.0)  
+        # ===== DATOS SENSORES =====
+        self.latest_data = {
+            'Temperatura1': None,
+            'Temperatura2': None,
+            'Temperatura3': None,
+            'Temperatura4': None,
+            'Humedad1': None,
+            'Humedad2': None,
+            'Temperatura5': None,
+            'Temperatura6': None,
+            'UV1': None,
+            'UV2': None,
+            'UV3': None,
+            'UV4': None,
+            'timestamp': None
+        }
 
-# Hilo para guardar datos en CSV
-def thread_guardado():
-    global latest_data, Dstcl, Tiempo, Temperatura, Dosis, remaining_time
-    
-    csvfile = None
-    writer = None
-    filename_actual = None
+        self.data_lock = threading.Lock()
 
-    while True:
+        # ===== EVENTOS =====
+        self.paro_eme = threading.Event()
+        self.paro_eme.set()
 
-        # Esperar hasta que el experimento inicie
-        guardar_event.wait()
+        self.guardar_event = threading.Event()
+        self.guardar_event.clear()
 
-        # Si cambia el experimento, genera un nuevo archivo
-        Tiempoh = Tiempo / 60
-        filename = f"exp_Time_{round(Tiempoh,2)}h_Temp_{Temperatura}C_Dosis_{int(Dosis)}J.csv"
+        # === CONTROL EXPERIMENTO ===
+    def iniciar_experimento(self, tiempo_min, temp, dosis):
+        self.total_duration = tiempo_min * 60
+        self.start_time = time.time()
+        self.remaining_time = self.total_duration
 
-        if filename != filename_actual:
-            filename_actual = filename
-            csvfile = open(filename, 'a', newline='')
-            writer = csv.writer(csvfile)
-            if csvfile.tell() == 0:
-                writer.writerow(['Timestamp', 'DS18B20_01', 'DS18B20_02', 'DS18B20_03', 'DS18B20_04', 'Humedad_01',
-                                 'Humedad_02', 'TemperaturaDHT_01', 'TemperaturaDHT_02', 'UV_01', 'UV_2', 'UV_03', 'UV_04'])
-            print(f"[CSV] Guardando en: {filename}")
+        self.setpoint_temp = temp
+        self.dosis = dosis
 
-        # Guardado mientras quede tiempo
-        while remaining_time > 0:
-            paro_eme.wait()  #paro de emergencia
+        self.estado = "RUNNING"
+        self.paro_eme.set()
+        self.guardar_event.set()
 
-            with data_lock:
-                data = latest_data.copy()
+        print("[BACKEND] Experimento iniciado")
+    def cambiar_estado(self, nuevo_estado):
+        if self.estado == nuevo_estado:
+            return  # No hacer nada si ya está en ese estado
 
-            fila = [
-                data['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
-                data['Temperatura1'],
-                data['Temperatura2'],
-                data['Temperatura3'],
-                data['Temperatura4'],
-                data['Humedad1'],
-                data['Humedad2'],
-                data['Temperatura5'],
-                data['Temperatura6'],
-                data['UV1'],
-                data['UV2'],
-                data['UV3'],
-                data['UV4']
-            ]
+        print(f"[BCKND] {self.estado} a {nuevo_estado}")
 
-            writer.writerow(fila)
-            csvfile.flush()
+        self.estado = nuevo_estado
 
-            print("[CSV] Guardado:", fila)
+        # ===== Acciones automáticas según estado =====
 
-            time.sleep(SAVE_INTERVAL)
+        if nuevo_estado == "IDLE":
+            self.remaining_time = 0
+            self.temp_all_off()
+            self.lamps_off()
+            self.guardar_event.clear()
 
-        # Fin del experimento → detener guardado
-        guardar_event.clear()
-        print("[CSV] Guardado detenido (experimento terminado)")
+        elif nuevo_estado == "RUNNING":
+            self.start_time = time.time()
+            self.guardar_event.set()
 
-        time.sleep(1)
+        elif nuevo_estado == "PAUSED":
+            self.temp_all_off()
+            self.lamps_off()
 
-def iniciar_experimento(tiempo_min):
-    global remaining_time, total_duration, start_time, runing
+        elif nuevo_estado == "FINISHED":
+            self.remaining_time = 0
+            self.temp_all_off()
+            self.lamps_off()
+            self.guardar_event.clear()
+            print("[BCKND] Experimento finalizado")
 
-    if runing:
-        return
+        elif nuevo_estado == "ERROR":
+            self.temp_all_off()
+            self.lamps_off()
+            self.guardar_event.clear()
+            print("[BCKND] ERROR detectado")
 
-    total_duration = tiempo_min * 60
-    start_time = time.time()
-    remaining_time = total_duration
+    # === HILOS ===
+    # Hilo para contar tiempo restante del experimento 
+    def thread_time(self):
+        while True:
+            if self.estado == "RUNNING":
+                elapsed = time.time() - self.start_time
+                self.remaining_time = max(self.total_duration - elapsed, 0)
 
-    paro_eme.set()
-    guardar_event.set()
+                if self.remaining_time <= 0:
+                    self.estado = "FINISHED"
 
-    runing = 1
-    print(f"[BACKEND] Experimento iniciado {tiempo_min} min")
-
-#hilo para contar tiempo restante del experimento 
-def thread_time():
-    global remaining_time, start_time, total_duration, runing
-
-    while True:
-
-        if runing and remaining_time > 0 and paro_eme.is_set():
-            now = time.time()
-            elapsed = now - start_time
-            remaining_time = max(total_duration - elapsed, 0)
-
-        time.sleep(1)
-
-# === Datos base ===
-cm = np.array([5.5, 11, 16.5, 22, 27.5])   # valores de distancia (cm)
-I = np.array([12860.42, 10472.92, 8147.5, 6287.5, 5150])   # valores de irradiancia (mW/m2)
-NEMApaso = 0.5 # paso de las charolas (cm)
-
-# === Interpolación ===
-def config():
-    coef = np.polyfit(cm, I, 4)
-    poly = np.poly1d(coef)
-    pase = int((27.5 - 5.5) / NEMApaso)
-	
-    x_line = np.linspace(min(cm), max(cm), pase)
-    y_line = poly(x_line)
-
-    return x_line, y_line
-
-
-#=======CONTROL RELEVADOR LAMPARAS UV=======
-
-def lamps_on():
-    GPIO.output(LUV_S, GPIO.HIGH)
-    GPIO.output(LUV_I, GPIO.HIGH)#CHECAR CON QUE FUNCIONA EL RELEVADOR
-    print("Lámparas ENCENDIDAS")
-
-def lamps_off():
-    GPIO.output(LUV_S, GPIO.LOW)
-    GPIO.output(LUV_I, GPIO.LOW)
-    print("Lámparas APAGADAS")
-
-#HILO PARA LAMPARAS
-def thread_lamps():
-    global remaining_time
-
-    lamps_off()
-
-    while True:
-        if remaining_time > 0:
-            if paro_eme.is_set():
-                lamps_on()
+            time.sleep(1)
+    # Hilo para prender/apagar lámparas UV
+    def thread_lamps(self):
+        self.lamps_off()
+        while True:
+            if self.estado == "RUNNING":
+                if self.paro_eme.is_set():
+                    self.lamps_on()
+                else:
+                    self.lamps_off()
             else:
-                lamps_off()
-        else:
-            lamps_off()
+                self.lamps_off()
 
-        time.sleep(0.5)
-
-#=======CONTROL TEMPERATURA=======
-
-def heat_on():
-    GPIO.output(A_RES, GPIO.HIGH)
-    GPIO.output(A_PLTR, GPIO.LOW)
-    GPIO.output(F_PLTR, GPIO.LOW)
-    print("Calentando...")
-
-def cool_on():
-    GPIO.output(A_PLTR, GPIO.LOW)
-    GPIO.output(A_PLTR, GPIO.HIGH)
-    GPIO.output(F_PLTR, GPIO.HIGH)
-    print("Enfriando...")
-
-def temp_all_off():
-    GPIO.output(A_RES, GPIO.LOW)
-    GPIO.output(A_PLTR, GPIO.LOW)
-    GPIO.output(F_PLTR, GPIO.LOW)
-    print("APAGADO")
-
-def thread_CNTRLtemp():
-    global latest_data, remaining_time, Temperatura
-
-    HISTERESIS = 1.0        # ±°C
-    TEMP_MAX = 80.0         # límite superior
-    TEMP_MIN = 20.0         # límite inferior
-
-    temp_all_off()          
-    while True:
-        if remaining_time <= 0:
-            temp_all_off()
-            time.sleep(1)
-            continue
-        if not paro_eme.is_set():
-            temp_all_off()
             time.sleep(0.5)
-            continue
-        with data_lock: # Leer temperaturas
-            temps = [
-                latest_data.get('Temperatura1'),
-                latest_data.get('Temperatura2'),
-                latest_data.get('Temperatura3'),
-                latest_data.get('Temperatura4'),
-            ]
+    # Hilo para controlar temperatura
+    def thread_CNTRLtemp(self):
+        HISTERESIS = 1.0        # ±°C
+        TEMP_MAX = 80.0         # límite superior
+        TEMP_MIN = 20.0         # límite inferior
+        self.temp_all_off()          
+        while True:
+            if self.estado == "RUNNING":
+                self.temp_all_off()
+                time.sleep(1)
+                continue
+            if not self.paro_eme.is_set():
+                self.temp_all_off()
+                time.sleep(0.5)
+                continue
+            with self.data_lock: # Leer temperaturas
+                temps = [
+                    self.latest_data.get('Temperatura1'),
+                    self.latest_data.get('Temperatura2'),
+                    self.latest_data.get('Temperatura3'),
+                    self.latest_data.get('Temperatura4'),
+                ]
 
-        temps_validas = [t for t in temps if t is not None]
+            temps_validas = [t for t in temps if t is not None]
 
-        if not temps_validas:
-            print("Sin lecturas válidas")
-            temp_all_off()
+            if not temps_validas:
+                print("Sin lecturas válidas")
+                self.temp_all_off()
+                time.sleep(1)
+                continue
+
+            Tmean = sum(temps_validas) / len(temps_validas)
+            print(f"Temperatura promedio: {round(Tmean,2)} °C")
+
+            if Tmean >= TEMP_MAX or Tmean <= TEMP_MIN:
+                print("LIMITE ALCANZADO")
+                self.temp_all_off()
+                self.paro_eme.clear()   # fuerza paro de emergencia
+                time.sleep(2)
+                continue
+
+            # Control ON/OFF con histéresis
+            if Tmean < (self.setpoint_temp - HISTERESIS):
+                self.heat_on()
+
+            elif Tmean > (self.setpoint_temp + HISTERESIS):
+                self.cool_on()
+
+            else:
+                self.temp_all_off()
+
+            time.sleep(5)  # periodo de control
+    # Hilo de guardado de lecturas en .CSV
+    def thread_guardado(self):
+        csvfile = None
+        writer = None
+        filename_actual = None
+
+        while True:
+            # Esperar hasta que el experimento inicie
+            self.guardar_event.wait()
+
+            # Si cambia el experimento, genera un nuevo archivo
+            Tiempoh = self.total_duration / 3600
+            filename = f"exp_Time_{round(Tiempoh,2)}h_Temp_{self.setpoint_temp}C_Dosis_{int(self.dosis)}J.csv"
+
+            if filename != filename_actual:
+                filename_actual = filename
+                csvfile = open(filename, 'a', newline='')
+                writer = csv.writer(csvfile)
+                if csvfile.tell() == 0:
+                    writer.writerow(['Timestamp', 'DS18B20_01', 'DS18B20_02', 'DS18B20_03', 'DS18B20_04', 'Humedad_01',
+                                    'Humedad_02', 'TemperaturaDHT_01', 'TemperaturaDHT_02', 'UV_01', 'UV_2', 'UV_03', 'UV_04'])
+                print(f"[CSV] Guardando en: {filename}")
+
+            # Guardado mientras quede tiempo
+            while self.estado == "RUNNING":
+                self.paro_eme.wait()  #paro de emergencia
+
+                with self.data_lock:
+                    data = self.latest_data.copy()
+
+                timestamp = data['timestamp']
+                if timestamp:
+                    ts = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    ts = "N/A"
+
+                fila = [
+                    ts,
+                    data['Temperatura1'],
+                    data['Temperatura2'],
+                    data['Temperatura3'],
+                    data['Temperatura4'],
+                    data['Humedad1'],
+                    data['Humedad2'],
+                    data['Temperatura5'],
+                    data['Temperatura6'],
+                    data['UV1'],
+                    data['UV2'],
+                    data['UV3'],
+                    data['UV4']
+                ]
+
+                writer.writerow(fila)
+                csvfile.flush()
+
+                print("[CSV] Guardado:", fila)
+
+                time.sleep(SAVE_INTERVAL)
+
+            # Si terminó el experimento detener guardado
+            self.guardar_event.clear()
+            print("[CSV] Guardado detenido (experimento terminado)")
+
             time.sleep(1)
-            continue
+    # Hilo de lectura de sensores DS18B20 (temperatura)
+    def thread_DS18B20(self):
+        while True:
+            try:
+                temp1 = sensor1.get_temperature()
+                temp2 = sensor2.get_temperature()
+                temp3 = sensor3.get_temperature()
+                temp4 = sensor4.get_temperature()
+                with self.data_lock:
+                    self.latest_data['Temperatura1'] = temp1
+                    self.latest_data['Temperatura2'] = temp2
+                    self.latest_data['Temperatura3'] = temp3
+                    self.latest_data['Temperatura4'] = temp4
+                    self.latest_data['timestamp'] = datetime.now()
+            except Exception as e:
+                print(f"Error lectura DS18B20: {e}")
+            time.sleep(1.0)
+    # Hilo de lectura de sensores UV Y DHT
+    def thread_DHT_UV(self):
+        while True:
+            try:
+                temp5, hum1 = leer_DHT(dht1)
+                time.sleep(2)
+                temp6, hum2 = leer_DHT(dht2)
+                uvs = leer_Uvs()
 
-        Tmean = sum(temps_validas) / len(temps_validas)
-        print(f"Temperatura promedio: {round(Tmean,2)} °C")
+                with self.data_lock:
+                    self.latest_data['Temperatura5'] = temp5
+                    self.latest_data['Temperatura6'] = temp6
+                    self.latest_data['Humedad1'] = hum1
+                    self.latest_data['Humedad2'] = hum2
+                    self.latest_data['UV1'] = uvs.get(0)
+                    self.latest_data['UV2'] = uvs.get(1)
+                    self.latest_data['UV3'] = uvs.get(4)
+                    self.latest_data['UV4'] = uvs.get(6)
+                    self.latest_data['timestamp'] = datetime.now()
+            except Exception as e:
+                print(f"Error lectura DS18B20: {e}")
+            time.sleep(20.0)
 
-        if Tmean >= TEMP_MAX or Tmean <= TEMP_MIN:
-            print("LIMITE ALCANZADO")
-            temp_all_off()
-            paro_eme.clear()   # fuerza paro de emergencia
-            time.sleep(2)
-            continue
+    # === CONTROL HARDWARE ===
+    # CONTROL RELEVADOR ACTUADORES TEMP
+    def heat_on(self):
+        GPIO.output(A_RES, GPIO.HIGH)
+        GPIO.output(A_PLTR, GPIO.LOW)
+        GPIO.output(F_PLTR, GPIO.LOW)
+        print("Calentando...")
+    def cool_on(self):
+        GPIO.output(A_PLTR, GPIO.LOW)
+        GPIO.output(A_PLTR, GPIO.HIGH)
+        GPIO.output(F_PLTR, GPIO.HIGH)
+        print("Enfriando...")
+    def temp_all_off(self):
+        GPIO.output(A_RES, GPIO.LOW)
+        GPIO.output(A_PLTR, GPIO.LOW)
+        GPIO.output(F_PLTR, GPIO.LOW)
+        print("TEMP APAGADO")
+    # CONTROL RELEVADOR LAMPARAS UV
+    def lamps_on(self):
+        GPIO.output(LUV_S, GPIO.HIGH)
+        GPIO.output(LUV_I, GPIO.HIGH)
+        print("Lámparas ENCENDIDAS")
+    def lamps_off(self):
+        GPIO.output(LUV_S, GPIO.LOW)
+        GPIO.output(LUV_I, GPIO.LOW)
+        print("Lámparas APAGADAS")
+    
 
-        # Control ON/OFF con histéresis
-        if Tmean < (Temperatura - HISTERESIS):
-            heat_on()
-
-        elif Tmean > (Temperatura + HISTERESIS):
-            cool_on()
-
-        else:
-            temp_all_off()
-
-        time.sleep(2)  # periodo de control
 
 #if __name__ == "__main__":
