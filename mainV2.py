@@ -1,30 +1,21 @@
-from BackendV2 import *
-from FrontendV2 import *
-
+from BackendV2 import CamaraUV
+from FrontendV2 import GUIdeploy
+import threading
+import tkinter as tk
 
 if __name__ == "__main__":
 
-    # === ARRANCAR BACKEND ===
-    t1 = threading.Thread(target=thread_DS18B20, daemon=True)
-    t2 = threading.Thread(target=thread_DHT_UV, daemon=True)
-    t3 = threading.Thread(target=thread_guardado, daemon=True)
-    t4 = threading.Thread(target=thread_lamps, daemon=True)
-    t5 = threading.Thread(target=thread_CNTRLtemp, daemon=True)
-    t6 = threading.Thread(target=thread_time, daemon=True)
+    camara = CamaraUV()
 
+    # === HILOS ===
+    threading.Thread(target=camara.thread_DS18B20, daemon=True).start()
+    threading.Thread(target=camara.thread_DHT_UV, daemon=True).start()
+    threading.Thread(target=camara.thread_guardado, daemon=True).start()
+    threading.Thread(target=camara.thread_lamps, daemon=True).start()
+    threading.Thread(target=camara.thread_CNTRLtemp, daemon=True).start()
+    threading.Thread(target=camara.thread_time, daemon=True).start()
 
-    t1.start()
-    t2.start()
-    t3.start()
-    t4.start()
-    t5.start()
-    t6.start()
-
-    print("[MAIN] Backend iniciado")
-
-    # === ARRANCAR GUI ===
-
+    # === GUI ===
     root = tk.Tk()
-    app = GUIdeploy(root)
-    app.conectar_backend(latest_data, data_lock, guardar_event, paro_eme)
+    app = GUIdeploy(root, camara)
     root.mainloop()

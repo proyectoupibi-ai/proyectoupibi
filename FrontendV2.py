@@ -2,7 +2,6 @@
 import tkinter as tk
 from tkinter import messagebox
 import threading
-import BackendV2 as BND
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -25,9 +24,10 @@ Dist, Irrad = BND.config()
 
 
 class GUIdeploy:
-    def __init__(self,root):
+    def __init__(self,root,camara):
         master = root
         self.master = master
+        self.camara = camara
         master.title("Cámara de Irradiación")
         master.geometry("700x700")
         master.resizable(False, False)

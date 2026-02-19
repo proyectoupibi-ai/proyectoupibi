@@ -170,17 +170,12 @@ class CamaraUV:
         # === CONTROL EXPERIMENTO ===
     def iniciar_experimento(self, tiempo_min, temp, dosis):
         self.total_duration = tiempo_min * 60
-        self.start_time = time.time()
         self.remaining_time = self.total_duration
-
         self.setpoint_temp = temp
         self.dosis = dosis
 
-        self.estado = "RUNNING"
-        self.paro_eme.set()
-        self.guardar_event.set()
+        self.cambiar_estado("RUNNING")
 
-        print("[BACKEND] Experimento iniciado")
     def cambiar_estado(self, nuevo_estado):
         if self.estado == nuevo_estado:
             return  # No hacer nada si ya está en ese estado
@@ -200,6 +195,7 @@ class CamaraUV:
         elif nuevo_estado == "RUNNING":
             self.start_time = time.time()
             self.guardar_event.set()
+            print("[BCKND] Experimento iniciado")
 
         elif nuevo_estado == "PAUSED":
             self.temp_all_off()
@@ -227,7 +223,7 @@ class CamaraUV:
                 self.remaining_time = max(self.total_duration - elapsed, 0)
 
                 if self.remaining_time <= 0:
-                    self.estado = "FINISHED"
+                    self.cambiar_estado("FINISHED")
 
             time.sleep(1)
     # Hilo para prender/apagar lámparas UV
@@ -235,10 +231,7 @@ class CamaraUV:
         self.lamps_off()
         while True:
             if self.estado == "RUNNING":
-                if self.paro_eme.is_set():
-                    self.lamps_on()
-                else:
-                    self.lamps_off()
+                self.lamps_on()
             else:
                 self.lamps_off()
 
@@ -250,7 +243,7 @@ class CamaraUV:
         TEMP_MIN = 20.0         # límite inferior
         self.temp_all_off()          
         while True:
-            if self.estado == "RUNNING":
+            if self.estado != "RUNNING":
                 self.temp_all_off()
                 time.sleep(1)
                 continue
@@ -280,7 +273,7 @@ class CamaraUV:
             if Tmean >= TEMP_MAX or Tmean <= TEMP_MIN:
                 print("LIMITE ALCANZADO")
                 self.temp_all_off()
-                self.paro_eme.clear()   # fuerza paro de emergencia
+                self.cambiar_estado("PAUSED")
                 time.sleep(2)
                 continue
 
@@ -407,7 +400,7 @@ class CamaraUV:
         GPIO.output(F_PLTR, GPIO.LOW)
         print("Calentando...")
     def cool_on(self):
-        GPIO.output(A_PLTR, GPIO.LOW)
+        GPIO.output(A_RES, GPIO.LOW)
         GPIO.output(A_PLTR, GPIO.HIGH)
         GPIO.output(F_PLTR, GPIO.HIGH)
         print("Enfriando...")
