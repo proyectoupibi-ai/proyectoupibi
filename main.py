@@ -10,12 +10,15 @@ if __name__ == "__main__":
     t3 = threading.Thread(target=thread_guardado, daemon=True)
     t4 = threading.Thread(target=thread_lamps, daemon=True)
     t5 = threading.Thread(target=thread_CNTRLtemp, daemon=True)
+    t6 = threading.Thread(target=thread_time, daemon=True)
+
 
     t1.start()
     t2.start()
     t3.start()
     t4.start()
     t5.start()
+    t6.start()
 
     print("[MAIN] Backend iniciado")
 

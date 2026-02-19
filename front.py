@@ -245,8 +245,8 @@ class GUIdeploy:
             self.paro_eme.set()     #viene del backend
             self.guardar_event.set()  #viene del backend
 
-            threading.Thread(target=BND.thread_Control, daemon=True).start()
-            threading.Thread(target=BND.thread_time, daemon=True).start()
+            #threading.Thread(target=BND.thread_Control, daemon=True).start()
+            #threading.Thread(target=BND.thread_time, daemon=True).start()
 
             self.runing = 1
             self.actualizar_tiempo_restante()
@@ -309,7 +309,7 @@ class GUIdeploy:
         try:
             Time = self.slider_tiempo.get()
             Dosis = self.slider_dosis.get()
-            Temperatura = self.slider_temp.get()
+            BND.Temperatura = self.slider_temp.get()
 
             if Time <= 0:
                 messagebox.showerror("Error", "El tiempo debe ser mayor a 0")

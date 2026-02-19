@@ -46,6 +46,8 @@ A_RES = 23    # resistencias
 A_PLTR = 24   # peltier
 F_PLTR = 25   # ventiladores celda peltier
 
+GPIO.setmode(GPIO.BCM)
+
 GPIO.setup(A_RES, GPIO.OUT)
 GPIO.setup(A_PLTR, GPIO.OUT)
 GPIO.setup(F_PLTR, GPIO.OUT)
@@ -53,7 +55,6 @@ GPIO.setup(F_PLTR, GPIO.OUT)
 LUV_S = 17   # lámparas uv superiores
 LUV_I = 18   # lámparas uv inferiores
 
-GPIO.setmode(GPIO.BCM)
 GPIO.setup(LUV_S, GPIO.OUT)
 GPIO.setup(LUV_I, GPIO.OUT)
 
@@ -264,6 +265,7 @@ def iniciar_experimento(tiempo_min):
     print(f"[BACKEND] Experimento iniciado {tiempo_min} min")
 
 #hilo para controlar Temperatura
+"""
 def thread_Control():
     global latest_data, remaining_time
     while True and remaining_time > 0:
@@ -283,8 +285,9 @@ def thread_Control():
                 print("Temperatura promedio no disponible (todos los sensores fallaron)")
 
         time.sleep(2.0)
-
+"""
 #hilo para contar tiempo restante del experimento 
+"""
 def thread_time():
     global remaining_time, start_time, total_duration
 
@@ -296,6 +299,18 @@ def thread_time():
         remaining_time = max(total_duration - elapsed,0)
 
         time.sleep(0.01)
+"""
+def thread_time():
+    global remaining_time, start_time, total_duration, runing
+
+    while True:
+
+        if runing and remaining_time > 0 and paro_eme.is_set():
+            now = time.time()
+            elapsed = now - start_time
+            remaining_time = max(total_duration - elapsed, 0)
+
+        time.sleep(1)
 
 # === Datos base ===
 cm = np.array([5.5, 11, 16.5, 22, 27.5])   # valores de distancia (cm)
