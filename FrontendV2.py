@@ -5,21 +5,8 @@ import threading
 import numpy as np
 import matplotlib.pyplot as plt
 
-# === CONFIGURACION THREADS ===
-# Variables compartidas Threading 
-#paro_eme = threading.Event()
-#paro_eme.set()  # Por defecto, el hilo sigue corriendo
 
-# datos globales 
-Dstcl = 0
-Tiempo = 1
-Temperatura = 20
-Dosis = 1
-runing = 0
-
-Dist, Irrad = BND.config()
-
-# === Función de cálculo ===
+# === Función de cálculo irradiación ===
 #1 J/m2 = W*s/m2
 
 
@@ -27,7 +14,7 @@ class GUIdeploy:
     def __init__(self,root,camara):
         master = root
         self.master = master
-        self.camara = camara
+        self.camara = camara 
         master.title("Cámara de Irradiación")
         master.geometry("700x700")
         master.resizable(False, False)
@@ -51,13 +38,6 @@ class GUIdeploy:
 
         # Mostrar vista inicial
         self.mostrar_inicio()
-
-    def conectar_backend(self, latest_data, data_lock, guardar_event, paro_eme):
-        self.latest_data = latest_data
-        self.data_lock = data_lock
-        self.guardar_event = guardar_event
-        self.paro_eme = paro_eme
-        #self.remaining_time = remaining_time
 
     def fmt(self, val, suf="", nd=2):
         if val is None:
@@ -156,9 +136,8 @@ class GUIdeploy:
         tk.Button(f, text="Volver al inicio", command=self.mostrar_inicio).grid(row=len(campos)+2, column=0, columnspan=2, pady=10)
 
     def actualizar_lecturas(self):
-
-        with self.data_lock:
-            data = self.latest_data.copy()
+        with self.camara.data_lock:
+            data = self.camara.latest_data.copy()
 
         # DS18B20
         self.labels_sensores["Temperatura1 (DS18B20-1)"].config(
@@ -227,34 +206,48 @@ class GUIdeploy:
     #---FUNCIONES EXTRA----
 
     def actualizar_tiempo_restante(self):
-        if BND.remaining_time > 0:
-            minutos = int(BND.remaining_time // 60)
-            segundos = int(BND.remaining_time % 60)
-            self.label_tiempo.config(text=f"Tiempo restante: {minutos:03d} min {segundos:02d} s")
-        else:
-            self.label_tiempo.config(text="Experimento finalizado.")
+        estado = self.camara.estado
+        t = self.camara.remaining_time
 
+        if estado == "RUNNING":
+            minutos = int(t // 60)
+            segundos = int(t % 60)
+            texto = f"Estado: {estado} | Tiempo: {minutos:03d}m {segundos:02d}s"
+
+        elif estado == "PAUSED":
+            texto = f"Estado: PAUSADO"
+
+        elif estado == "FINISHED":
+            texto = "Experimento finalizado"
+
+        else:
+            texto = f"Estado: {estado}"
+
+        self.label_tiempo.config(text=texto)
         self.master.after(1000, self.actualizar_tiempo_restante)
 
     def INICIO(self):
         try:
-            Tiempo = self.slider_tiempo.get()
+            if self.camara.estado == "RUNNING":
+                messagebox.showwarning("Aviso", "El experimento ya está en ejecución.")
+                return
 
-            BND.iniciar_experimento(Tiempo)
-
-            self.paro_eme.set()     #viene del backend
-            self.guardar_event.set()  #viene del backend
-
-            #threading.Thread(target=BND.thread_Control, daemon=True).start()
-            #threading.Thread(target=BND.thread_time, daemon=True).start()
-
-            self.runing = 1
+            if self.camara.estado == "PAUSED":
+                messagebox.showwarning("Aviso", "Reanude el experimento.")
+                return
+    
+            self.camara.iniciar_experimento(
+                self.slider_tiempo.get(),
+                self.slider_temp.get(),
+                self.slider_dosis.get()
+            )
+            
             self.actualizar_tiempo_restante()
 
             self.btn_INICIO.config(bg="green", fg="white", text="Experimento en curso")
 
             def check_end():
-                if BND.remaining_time <= 0:
+                if self.camara.remaining_time <= 0:
                     self.btn_INICIO.config(bg="lightgray", fg="black", text="Iniciar experimento")
                 else:
                     self.master.after(1000, check_end)
@@ -271,9 +264,9 @@ class GUIdeploy:
     def muestras(self):
         try:
             # Usar variables internas de la clase
-            if BND.remaining_time == 0:
+            if self.camara.remaining_time == 0:
                 self.cargar()
-            elif self.runing == 0:
+            elif self.camara.estado == "PAUSED":
                 self.cargar()
             else:
                 messagebox.showerror("Error", "Experimento en curso")
@@ -281,35 +274,29 @@ class GUIdeploy:
             messagebox.showerror("Error", "Experimento en curso")
 
     def toggle_paro(self):
-        if self.parado.get():
-            #REANUDAR
-            self.paro_eme.set()
-            self.btn_STOP.config(
-                text="PARO DE EMERGENCIA",
-                bg="yellow",
-                fg="black"
-            )
-            self.parado.set(False)
-            self.runing = 1
-            print("Experimento reanudado.")
 
-        else:
-            #PARO
-            self.paro_eme.clear()
+        if self.camara.estado == "RUNNING":
+            self.camara.cambiar_estado("PAUSED")
             self.btn_STOP.config(
                 text="REANUDAR",
                 bg="red",
                 fg="white"
             )
-            self.parado.set(True)
-            self.runing = 0
             print("Experimento pausado.")
+        elif self.camara.estado == "PAUSED":
+            self.camara.cambiar_estado("RUNNING")
+            self.btn_STOP.config(
+                text="PARO DE EMERGENCIA",
+                bg="yellow",
+                fg="black"
+            )
+            print("Experimento reanudado.")
+
 
     def calcularcm(self):
         try:
             Time = self.slider_tiempo.get()
             Dosis = self.slider_dosis.get()
-            BND.Temperatura = self.slider_temp.get()
 
             if Time <= 0:
                 messagebox.showerror("Error", "El tiempo debe ser mayor a 0")
@@ -318,6 +305,9 @@ class GUIdeploy:
             # Calcular irradiancia requerida
             Irradiancia = Dosis / (Time * 60)
             Irradiancia *= 1000   # convertir a mW/m2
+            # Cargar valores de backend 
+            Irrad = self.camara.irrad
+            Dist = self.camara.dist
 
             # Buscar valor más cercano en la tabla de irradiancias
             idx = np.argmin(np.abs(Irrad - Irradiancia))

@@ -141,6 +141,10 @@ class CamaraUV:
         self.setpoint_temp = 25
         self.dosis = 0
 
+        Dist, Irrad = config()
+        self.irrad = Irrad
+        self.dist = Dist
+
         # ===== DATOS SENSORES =====
         self.latest_data = {
             'Temperatura1': None,
