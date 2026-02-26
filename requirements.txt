@@ -1,4 +1,5 @@
 Adafruit-Blinka==8.65.0
+Adafruit-Blinka-Raspberry-Pi5-Neopixel==1.0.0rc2
 adafruit-circuitpython-busdevice==5.2.13
 adafruit-circuitpython-connectionmanager==3.1.5
 adafruit-circuitpython-dht==4.0.9
@@ -15,9 +16,10 @@ contourpy==1.3.3
 cycler==0.12.1
 fonttools==4.59.2
 kiwisolver==1.4.9
+lgpio==0.2.2.0
 matplotlib==3.10.6
 modbus_tk==1.1.5
-numpy==2.3.3
+numpy==1.26.4
 packaging==25.0
 pigpio==1.78
 pillow==11.3.0
@@ -27,6 +29,7 @@ pyserial==3.5
 python-dateutil==2.9.0.post0
 pyusb==1.3.1
 RPi.GPIO==0.7.1
+rpi_ws281x==5.0.0
 six==1.17.0
 smbus==1.1.post2
 smbus2==0.5.0
