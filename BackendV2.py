@@ -349,7 +349,7 @@ class CamaraUV:
 
                 print("[CSV] Guardado:", fila)
 
-                time.sleep(SAVE_INTERVAL)
+                time.sleep(60)
 
             # Si terminó el experimento detener guardado
             self.guardar_event.clear()

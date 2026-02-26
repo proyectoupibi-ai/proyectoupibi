@@ -212,7 +212,7 @@ class GUIdeploy:
         if estado == "RUNNING":
             minutos = int(t // 60)
             segundos = int(t % 60)
-            texto = f"Estado: {estado} | Tiempo: {minutos:03d}m {segundos:02d}s"
+            texto = f"Tiempo: {minutos:03d}m {segundos:02d}s"
 
         elif estado == "PAUSED":
             texto = f"Estado: PAUSADO"
